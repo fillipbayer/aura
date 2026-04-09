@@ -662,7 +662,6 @@
       <canvas id="shareCanvas" width="900" height="900"></canvas>
       <div class="share-actions">
         <button class="share-action-btn primary" id="phizShareBtn">compartilhar</button>
-        <button class="share-action-btn ghost"   id="copyShareBtn">copiar</button>
       </div>
       <p class="share-tip" id="shareTip"></p>
     </div>
@@ -1369,7 +1368,6 @@
     const APP_NAME = 'Aura';
     const shareOverlay  = document.getElementById('shareOverlay');
     const shareCanvas   = document.getElementById('shareCanvas');
-    const copyShareBtn  = document.getElementById('copyShareBtn');
     const phizShareBtn  = document.getElementById('phizShareBtn');
     const closeShareBtn = document.getElementById('closeShareBtn');
     const shareTip      = document.getElementById('shareTip');
@@ -1448,6 +1446,12 @@
       glowG.addColorStop(1, 'rgba(0,0,0,0)');
       ctx.fillStyle = glowG;
       ctx.fillRect(0, 0, W, H);
+
+      // "Aura do dia" — abaixo do orb
+      ctx.font = '300 26px -apple-system, Inter, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      ctx.textAlign = 'center';
+      ctx.fillText('Aura do dia', W / 2, H * 0.38);
 
       // Message text — sem aspas, fonte maior, mais presença
       ctx.font = 'italic 600 44px Georgia, serif';
@@ -1579,35 +1583,11 @@
               resolve(); return;
             } catch(e) {}
           }
-          // Último recurso: copia imagem para clipboard
-          copyShareImage();
           resolve();
         }, 'image/png');
       });
     }
 
-    async function copyShareImage() {
-      try {
-        shareCanvas.toBlob(async blob => {
-          // Tenta copiar a imagem para o clipboard
-          if (navigator.clipboard && window.ClipboardItem) {
-            try {
-              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-              copyShareBtn.textContent = 'copiado! ✦';
-              setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
-              return;
-            } catch(e) {}
-          }
-          // Fallback: baixa a imagem como arquivo
-          const a = document.createElement('a');
-          a.download = APP_NAME.toLowerCase() + '-mensagem.png';
-          a.href = shareCanvas.toDataURL('image/png');
-          a.click();
-          copyShareBtn.textContent = 'salvo! ✦';
-          setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
-        }, 'image/png');
-      } catch(e) {}
-    }
 
     /* ─── PHIZ NATIVE SHARE ─────────────────────────────────── */
     // onShareAppMessage é chamado pelo SDK Phiz quando o usuário
@@ -1633,8 +1613,6 @@
     shareBtn.addEventListener('touchend', e => { e.preventDefault(); handleShare(); });
     phizShareBtn.addEventListener('click', phizShareFromCard);
     phizShareBtn.addEventListener('touchend', e => { e.preventDefault(); phizShareFromCard(); });
-    copyShareBtn.addEventListener('click', copyShareImage);
-    copyShareBtn.addEventListener('touchend', e => { e.preventDefault(); copyShareImage(); });
     closeShareBtn.addEventListener('click', closeShareCard);
     closeShareBtn.addEventListener('touchend', e => { e.preventDefault(); closeShareCard(); });
 
