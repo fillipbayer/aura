@@ -512,20 +512,23 @@
 
     /* fechar — topo centralizado */
     .share-close-btn {
+      width: 38px;
+      height: 38px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       background: rgba(255,255,255,0.12);
       border: 1px solid rgba(255,255,255,0.18);
-      color: rgba(255,255,255,0.75);
+      color: rgba(255,255,255,0.78);
       font-family: 'Inter', sans-serif;
-      font-size: 11px;
-      font-weight: 500;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      padding: 8px 28px;
-      border-radius: 50px;
+      font-size: 18px;
+      font-weight: 400;
+      line-height: 1;
       cursor: pointer;
       outline: none;
       -webkit-appearance: none;
       transition: all 0.2s ease;
+      border-radius: 999px;
     }
     .share-close-btn:active { transform: scale(0.95); opacity: 0.7; }
 
@@ -655,7 +658,7 @@
   <!-- Share card preview overlay -->
   <div class="share-overlay" id="shareOverlay">
     <div class="share-card-wrap" id="shareCardWrap">
-      <button class="share-close-btn" id="closeShareBtn">fechar</button>
+      <button class="share-close-btn" id="closeShareBtn" aria-label="Fechar compartilhamento">×</button>
       <canvas id="shareCanvas" width="900" height="900"></canvas>
       <div class="share-actions">
         <button class="share-action-btn primary" id="phizShareBtn">compartilhar</button>
@@ -1076,61 +1079,86 @@
         const ctx = getAudioCtx();
         const now = ctx.currentTime;
 
-        // Master limiter/compressor
+        // Master compressor para manter tudo elegante e controlado
         const comp = ctx.createDynamicsCompressor();
-        comp.threshold.value = -6;
-        comp.ratio.value = 4;
+        comp.threshold.value = -14;
+        comp.ratio.value = 3;
+        comp.attack.value = 0.01;
+        comp.release.value = 0.22;
         comp.connect(ctx.destination);
 
-        // Acorde alegre — Dó maior com extensão (C E G C E)
-        const chord = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+        // Camada principal: swell luminoso, mais cinematográfico e menos infantil
+        const bloom = ctx.createOscillator();
+        const bloomGain = ctx.createGain();
+        const bloomFilter = ctx.createBiquadFilter();
+        bloom.type = 'triangle';
+        bloom.frequency.setValueAtTime(340, now);
+        bloom.frequency.exponentialRampToValueAtTime(640, now + 0.32);
+        bloomFilter.type = 'lowpass';
+        bloomFilter.frequency.setValueAtTime(900, now);
+        bloomFilter.frequency.exponentialRampToValueAtTime(3200, now + 0.36);
+        bloomGain.gain.setValueAtTime(0.001, now);
+        bloomGain.gain.exponentialRampToValueAtTime(0.11, now + 0.08);
+        bloomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+        bloom.connect(bloomFilter);
+        bloomFilter.connect(bloomGain);
+        bloomGain.connect(comp);
+        bloom.start(now);
+        bloom.stop(now + 0.8);
+
+        // Harmônicos abertos: acorde suspenso/aspiracional em vez de "fofinho"
+        const chord = [392.0, 493.88, 587.33, 783.99];
         chord.forEach((freq, i) => {
           const osc  = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(freq * 0.98, now + i * 0.04);
-          osc.frequency.linearRampToValueAtTime(freq, now + i * 0.04 + 0.08);
-          gain.gain.setValueAtTime(0, now + i * 0.04);
-          gain.gain.linearRampToValueAtTime(0.16 - i * 0.015, now + i * 0.04 + 0.05);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.8);
+          osc.type = i % 2 === 0 ? 'sine' : 'triangle';
+          osc.frequency.setValueAtTime(freq * 0.985, now + i * 0.03);
+          osc.frequency.exponentialRampToValueAtTime(freq, now + i * 0.03 + 0.12);
+          gain.gain.setValueAtTime(0.001, now + i * 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.075 - i * 0.01, now + i * 0.03 + 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.03 + 0.95);
           osc.connect(gain);
           gain.connect(comp);
-          osc.start(now + i * 0.04);
-          osc.stop(now + i * 0.04 + 0.9);
+          osc.start(now + i * 0.03);
+          osc.stop(now + i * 0.03 + 1.0);
         });
 
-        // Cintilação — notas agudas em sequência ascendente
-        const sparkNotes = [2093, 2349, 2637, 3136, 4186];
+        // Cintilação final: poucas notas altas, mais refinadas
+        const sparkNotes = [1174.66, 1318.5, 1567.98];
         sparkNotes.forEach((freq, i) => {
           const osc  = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'triangle';
+          osc.type = 'sine';
           osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.07, now + 0.12 + i * 0.055);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12 + i * 0.055 + 0.35);
+          gain.gain.setValueAtTime(0.001, now + 0.18 + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.03, now + 0.21 + i * 0.08);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55 + i * 0.08);
           osc.connect(gain);
           gain.connect(comp);
-          osc.start(now + 0.12 + i * 0.055);
-          osc.stop(now + 0.12 + i * 0.055 + 0.4);
+          osc.start(now + 0.18 + i * 0.08);
+          osc.stop(now + 0.62 + i * 0.08);
         });
 
-        // Ruído suave de "whoosh" na explosão
-        const bufSize = ctx.sampleRate * 0.15;
+        // Ar sutil para dar sensação de expansão sem soar infantil
+        const bufSize = ctx.sampleRate * 0.22;
         const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
         const data = buf.getChannelData(0);
-        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
         const noise = ctx.createBufferSource();
         noise.buffer = buf;
         const noiseFilter = ctx.createBiquadFilter();
-        noiseFilter.type = 'highpass';
-        noiseFilter.frequency.value = 3000;
+        noiseFilter.type = 'bandpass';
+        noiseFilter.frequency.value = 1800;
+        noiseFilter.Q.value = 0.7;
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.12, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        noiseGain.gain.setValueAtTime(0.001, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.028, now + 0.04);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(comp);
         noise.start(now);
+        noise.stop(now + 0.25);
       } catch(e) {}
     }
 
