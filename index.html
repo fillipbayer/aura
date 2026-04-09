@@ -582,10 +582,10 @@
       text-align: center;
     }
 
-    /* ─── DONATION BUTTON (fixed bottom) ────────── */
+    /* ─── DONATION BUTTON (dentro da msg-overlay) ── */
     .donate-bar {
-      position: fixed;
-      bottom: 20px;
+      position: absolute;
+      bottom: 24px;
       left: 0; right: 0;
       display: flex;
       justify-content: center;
@@ -797,6 +797,10 @@
         <button class="msg-btn" id="msgBtn">← nova mensagem</button>
       </div>
     </div>
+    <!-- Donation button — visível apenas na tela de mensagem -->
+    <div class="donate-bar">
+      <button class="donate-btn" id="donateBtn">doe R$ 1,00 ao desenvolvedor</button>
+    </div>
   </div>
 
   <!-- Share card preview overlay -->
@@ -811,11 +815,6 @@
     </div>
   </div>
 
-  <!-- Donation button (fixed bottom) -->
-  <div class="donate-bar">
-    <button class="donate-btn" id="donateBtn">doe R$ 1,00 ao desenvolvedor</button>
-  </div>
-
   <!-- Donation overlay -->
   <div class="donate-overlay" id="donateOverlay">
     <div class="donate-card">
@@ -824,7 +823,7 @@
       <div class="donate-title">Apoie a Aura</div>
       <div class="donate-sub">Ajude a manter esse espaço de presença e intenção vivo.</div>
       <div class="donate-amount">R$ 1,00</div>
-      <button class="donate-pay-btn" id="donatePayBtn">pagar com Phiz</button>
+      <button class="donate-pay-btn" id="donatePayBtn">Pagar com Phiz</button>
       <div class="donate-note" id="donateNote">pagamento seguro via Phiz Pay</div>
     </div>
   </div>
@@ -1853,13 +1852,13 @@
             setTimeout(function() {
               closeDonate();
               donatePayBtn.disabled = false;
-              donatePayBtn.textContent = 'pagar com Phiz';
+              donatePayBtn.textContent = 'Pagar com Phiz';
               donateNote.textContent = 'pagamento seguro via Phiz Pay';
             }, 2800);
           },
           fail: function(err) {
             donatePayBtn.disabled = false;
-            donatePayBtn.textContent = 'pagar com Phiz';
+            donatePayBtn.textContent = 'Pagar com Phiz';
             const msg = (err && err.errMsg) ? err.errMsg : 'pagamento cancelado';
             donateNote.textContent = msg;
             setTimeout(function() { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3000);
@@ -1867,7 +1866,7 @@
         }));
       } catch(e) {
         donatePayBtn.disabled = false;
-        donatePayBtn.textContent = 'pagar com Phiz';
+        donatePayBtn.textContent = 'Pagar com Phiz';
         donateNote.textContent = 'backend de pagamento não configurado';
         setTimeout(function() { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3500);
       }
