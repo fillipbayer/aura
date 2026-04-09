@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="format-detection" content="telephone=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <title>Aura</title>
+  <link rel="icon" id="favicon" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,400;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    :root {
+      --hold-ms: 2500;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #fdf4f8;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+      touch-action: none;
+    }
+
+    /* ─── BACKGROUND ─────────────────────────────── */
+    .bg {
+      position: fixed;
+      inset: 0;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 15% 10%, rgba(205, 185, 202, 0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 70% 70% at 85% 5%,  rgba(190, 182, 215, 0.14) 0%, transparent 60%),
+        radial-gradient(ellipse 90% 50% at 50% 105%, rgba(215, 202, 190, 0.11) 0%, transparent 60%);
+      background-color: #f8f5f7;
+      animation: bgTint 28s ease-in-out infinite;
+      z-index: 0;
+    }
+
+    @keyframes bgTint {
+      0%   { background-color: #f8f5f7; } /* morno-neutro */
+      20%  { background-color: #f5f5f9; } /* frio-neutro  */
+      40%  { background-color: #f7f6f4; } /* quente-neutro */
+      60%  { background-color: #f5f7f8; } /* azul-neutro  */
+      80%  { background-color: #f7f5f6; }
+      100% { background-color: #f8f5f7; }
+    }
+
+    /* ─── SCENE ──────────────────────────────────── */
+    .scene {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 100%;
+      gap: 0;
+    }
+
+    /* ─── EYEBROW TITLE ──────────────────────────── */
+    .eyebrow {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 3.5px;
+      text-transform: uppercase;
+      color: #c9a8d4;
+      margin-bottom: 52px;
+      opacity: 1;
+      transition: opacity 0.4s ease;
+    }
+    .eyebrow.fade { opacity: 0; }
+
+    /* ─── ORB AREA ───────────────────────────────── */
+    .orb-area {
+      position: relative;
+      width: 240px;
+      height: 240px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    /* Outer ambient glow */
+    .orb-ambient {
+      position: absolute;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 30%, #a78bf5, #60a5fa 50%, #f472b6);
+      filter: blur(36px);
+      opacity: 0.35;
+      animation: ambientPulse 3.5s ease-in-out infinite;
+      transition: opacity 0.4s ease, width 0.4s ease, height 0.4s ease, filter 0.4s ease;
+      pointer-events: none;
+    }
+
+    @keyframes ambientPulse {
+      0%, 100% { transform: scale(1);    opacity: 0.35; }
+      50%       { transform: scale(1.18); opacity: 0.5; }
+    }
+
+    /* SVG progress ring — fica dentro do floater para acompanhar o float */
+    .ring-svg {
+      position: absolute;
+      /* orb = 210px, viewBox = 272px  →  offset = -(272-210)/2 = -31px */
+      top:  -31px;
+      left: -31px;
+      width:  272px;
+      height: 272px;
+      transform: rotate(-90deg);
+      opacity: 0;
+      transition: opacity 0.35s ease;
+      pointer-events: none;
+    }
+    .ring-svg.show { opacity: 1; }
+
+    .ring-track {
+      fill: none;
+      stroke: rgba(196,113,237,0.15);
+      stroke-width: 2.5;
+    }
+
+    .ring-progress {
+      fill: none;
+      stroke: url(#rg);
+      stroke-width: 3;
+      stroke-linecap: round;
+      transition: none;
+    }
+
+    /* The Orb itself */
+    .orb-floater {
+      position: relative;   /* necessário para o ring absolute dentro */
+      width:  210px;
+      height: 210px;
+      animation: orbFloat 4s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .orb-floater.paused { animation-play-state: paused; }
+
+    .orb {
+      width: 210px;
+      height: 210px;
+      border-radius: 50%;
+      position: relative;
+      overflow: hidden;
+      background: conic-gradient(from 0deg, #c084fc, #60a5fa, #818cf8, #f472b6, #c084fc);
+      box-shadow:
+        0 0 0   2px rgba(160,130,245,0.15),
+        0 0 30px rgba(129,140,248,0.45),
+        0 0 70px rgba(192,132,252,0.20),
+        inset 0 0 50px rgba(255,255,255,0.08);
+      animation: orbColorSpin 9s linear infinite;
+      transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.4s ease;
+      will-change: transform;
+    }
+
+    /* Highlight sheen on orb */
+    .orb::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.55) 0%, transparent 55%);
+      pointer-events: none;
+    }
+
+    /* Inner fluid blob */
+    .orb::after {
+      content: '';
+      position: absolute;
+      width: 160%;
+      height: 160%;
+      top: -30%;
+      left: -30%;
+      border-radius: 40% 60% 55% 45% / 45% 35% 65% 55%;
+      background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
+      animation: blobMorph 6s ease-in-out infinite alternate;
+    }
+
+    @keyframes blobMorph {
+      0%   { border-radius: 40% 60% 55% 45% / 45% 35% 65% 55%; }
+      33%  { border-radius: 55% 45% 40% 60% / 60% 55% 45% 40%; }
+      66%  { border-radius: 60% 40% 60% 40% / 40% 60% 40% 60%; }
+      100% { border-radius: 45% 55% 45% 55% / 55% 45% 55% 45%; }
+    }
+
+    @keyframes orbFloat {
+      0%, 100% { transform: translateY(0px);   }
+      50%       { transform: translateY(-14px); }
+    }
+
+    @keyframes orbColorSpin {
+      from { filter: hue-rotate(0deg)   brightness(1); }
+      to   { filter: hue-rotate(360deg) brightness(1); }
+    }
+
+    /* Hold state */
+    .orb.is-holding {
+      transform: scale(1.16);
+      box-shadow:
+        0 0 0   3px rgba(160,130,245,0.3),
+        0 0 50px rgba(129,140,248,0.75),
+        0 0 100px rgba(244,114,182,0.45),
+        0 0 180px rgba(129,140,248,0.25),
+        inset 0 0 50px rgba(255,255,255,0.12);
+      animation: orbColorSpin 3s linear infinite, orbHoldPulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes orbHoldPulse {
+      0%, 100% { transform: scale(1.16); }
+      50%       { transform: scale(1.20); }
+    }
+
+    /* Explosion */
+    .orb.is-exploding {
+      animation: orbExplode 0.65s cubic-bezier(0.2, 0, 0.8, 1) forwards !important;
+    }
+
+    @keyframes orbExplode {
+      0%   { transform: scale(1.18); opacity: 1; filter: hue-rotate(180deg) brightness(1.5); }
+      25%  { transform: scale(1.5);  opacity: 1; filter: hue-rotate(280deg) brightness(2); }
+      55%  { transform: scale(2.2);  opacity: 0.7; filter: blur(8px) brightness(2.5); }
+      100% { transform: scale(3.5);  opacity: 0;   filter: blur(25px); }
+    }
+
+    @keyframes orbReform {
+      0%   { transform: scale(0); opacity: 0; filter: blur(20px); }
+      60%  { transform: scale(1.12); opacity: 1; filter: blur(0px); }
+      80%  { transform: scale(0.95); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* ─── HINT TEXT ──────────────────────────────── */
+    .hint-wrap {
+      margin-top: 52px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      opacity: 1;
+      transition: opacity 0.4s ease;
+    }
+    .hint-wrap.fade { opacity: 0; }
+
+    .hint-main {
+      font-size: 11px;
+      color: #bf9dcc;
+      letter-spacing: 0.3px;
+      text-align: center;
+    }
+
+    .hint-sub {
+      font-size: 10px;
+      color: #d4b8de;
+      letter-spacing: 0.2px;
+      text-align: center;
+    }
+
+    /* ─── PARTICLES ──────────────────────────────── */
+    #particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      overflow: hidden;
+    }
+
+    .p {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      will-change: transform, opacity;
+      animation: pFly var(--d) var(--ease) var(--delay) forwards;
+    }
+
+    @keyframes pFly {
+      0%   { transform: translate(0,0) scale(1); opacity: 1; }
+      70%  { opacity: 0.8; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0); opacity: 0; }
+    }
+
+    /* ─── MESSAGE OVERLAY ────────────────────────── */
+    .msg-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 32px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.7s ease;
+    }
+
+    .msg-overlay.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .msg-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(253, 240, 248, 0.72);
+      backdrop-filter: blur(24px) saturate(160%);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+    }
+
+    .msg-card {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      transform: translateY(28px) scale(0.97);
+      transition: transform 1s cubic-bezier(0.34, 1.56, 0.64, 1);
+      max-width: 360px;
+      width: 100%;
+    }
+
+    .msg-overlay.show .msg-card {
+      transform: translateY(0) scale(1);
+    }
+
+    /* Orb-like icon in message */
+    .msg-orb {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, #c084fc, #60a5fa, #818cf8, #f472b6, #c084fc);
+      margin: 0 auto 32px;
+      box-shadow: 0 8px 40px rgba(129,140,248,0.5), 0 0 0 8px rgba(129,140,248,0.08);
+      animation: orbColorSpin 6s linear infinite;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .msg-orb::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 50%;
+      background: radial-gradient(circle at 33% 28%, rgba(255,255,255,0.5) 0%, transparent 55%);
+    }
+
+    .msg-quote-mark {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-size: 56px;
+      color: rgba(196,113,237,0.2);
+      line-height: 1;
+      margin-bottom: -12px;
+      display: block;
+    }
+
+    .msg-text {
+      font-family: 'Playfair Display', 'Georgia', serif;
+      font-size: clamp(18px, 5vw, 24px);
+      line-height: 1.55;
+      color: #2a1535;
+      font-style: italic;
+      font-weight: 500;
+      margin-bottom: 28px;
+      letter-spacing: 0.1px;
+    }
+
+    .msg-line {
+      width: 36px;
+      height: 2px;
+      background: linear-gradient(90deg, #c084fc, #60a5fa);
+      border-radius: 2px;
+      margin: 0 auto 20px;
+    }
+
+    .msg-label {
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      color: #c9a8d4;
+      margin-bottom: 32px;
+      display: block;
+    }
+
+    /* Botão principal: COMPARTILHAR */
+    .share-btn-main {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 36px;
+      border-radius: 50px;
+      background: linear-gradient(135deg, #c084fc, #818cf8 50%, #60a5fa);
+      color: #fff;
+      font-size: 13px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: none;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      outline: none;
+      box-shadow: 0 8px 32px rgba(129,140,248,0.45);
+      -webkit-appearance: none;
+    }
+    .share-btn-main:active { transform: scale(0.96); box-shadow: 0 4px 16px rgba(129,140,248,0.3); }
+
+    /* Botão discreto: voltar */
+    .msg-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 20px;
+      border: none;
+      border-radius: 50px;
+      background: transparent;
+      color: #b0a0c0;
+      font-size: 11px;
+      font-family: 'Inter', sans-serif;
+      font-weight: 400;
+      letter-spacing: 0.5px;
+      cursor: pointer;
+      transition: color 0.2s ease;
+      outline: none;
+      -webkit-appearance: none;
+    }
+    .msg-btn:active { color: #8070a0; }
+
+    /* ─── FLOATING SPARKLES ──────────────────────── */
+    .spark {
+      position: fixed;
+      pointer-events: none;
+      z-index: 18;
+      font-size: var(--fs);
+      color: var(--c);
+      animation: sparkAnim var(--dur) ease-out forwards;
+      line-height: 1;
+    }
+
+    @keyframes sparkAnim {
+      0%   { opacity: 0; transform: scale(0) rotate(0deg)   translateY(0); }
+      25%  { opacity: 1; transform: scale(1) rotate(60deg)  translateY(-8px); }
+      75%  { opacity: 0.7; }
+      100% { opacity: 0; transform: scale(0.3) rotate(160deg) translateY(-30px); }
+    }
+
+    /* ─── MSG ACTIONS — share em destaque ──────── */
+    .msg-actions {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* ícone-share antigo não usado */
+    .share-btn { display: none; }
+
+    /* ─── SHARE OVERLAY ──────────────────────────── */
+    .share-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(30,10,40,0.55);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.4s ease;
+    }
+    .share-overlay.show {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .share-card-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      width: 100%;
+      max-width: 320px;
+      transform: translateY(20px) scale(0.96);
+      transition: transform 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    .share-overlay.show .share-card-wrap {
+      transform: translateY(0) scale(1);
+    }
+
+    /* fechar — topo centralizado */
+    .share-close-btn {
+      background: rgba(255,255,255,0.12);
+      border: 1px solid rgba(255,255,255,0.18);
+      color: rgba(255,255,255,0.75);
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 8px 28px;
+      border-radius: 50px;
+      cursor: pointer;
+      outline: none;
+      -webkit-appearance: none;
+      transition: all 0.2s ease;
+    }
+    .share-close-btn:active { transform: scale(0.95); opacity: 0.7; }
+
+    #shareCanvas {
+      width: 280px;
+      height: 280px;
+      border-radius: 24px;
+      box-shadow: 0 24px 60px rgba(130,50,180,0.35), 0 0 0 1px rgba(255,255,255,0.1);
+      display: block;
+    }
+
+    .share-actions {
+      display: flex;
+      gap: 10px;
+      width: 100%;
+    }
+
+    .share-action-btn {
+      flex: 1;
+      padding: 13px 0;
+      border-radius: 50px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      outline: none;
+      -webkit-appearance: none;
+      transition: all 0.2s ease;
+    }
+    /* Compartilhar — destaque gradient Aura */
+    .share-action-btn.primary {
+      background: linear-gradient(135deg, #c084fc, #818cf8 50%, #60a5fa);
+      color: #fff;
+      box-shadow: 0 6px 24px rgba(129,140,248,0.45);
+    }
+    /* Copiar — ghost */
+    .share-action-btn.ghost {
+      background: rgba(255,255,255,0.13);
+      color: rgba(255,255,255,0.85);
+      border: 1px solid rgba(255,255,255,0.18);
+    }
+    .share-action-btn:active { transform: scale(0.95); }
+
+    .share-tip {
+      font-size: 10px;
+      color: rgba(255,255,255,0.45);
+      letter-spacing: 0.3px;
+      text-align: center;
+    }
+
+    /* ─── FLASH OVERLAY ─────────────────────────── */
+    .flash {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(circle, rgba(255,200,230,0.9) 0%, transparent 70%);
+      z-index: 8;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.08s ease;
+    }
+    .flash.pop { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <div class="bg" id="bg"></div>
+  <div id="particles"></div>
+  <div class="flash" id="flash"></div>
+
+  <!-- Main scene -->
+  <div class="scene">
+    <div class="eyebrow" id="eyebrow">aura</div>
+
+    <div class="orb-area" id="orbArea">
+
+      <div class="orb-ambient" id="ambient"></div>
+
+      <div class="orb-floater" id="floater">
+        <!-- Ring dentro do floater → sempre centralizado no orb -->
+        <svg class="ring-svg" id="ringSvg" viewBox="0 0 272 272">
+          <defs>
+            <linearGradient id="rg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%"   stop-color="#c084fc"/>
+              <stop offset="50%"  stop-color="#818cf8"/>
+              <stop offset="100%" stop-color="#60a5fa"/>
+            </linearGradient>
+          </defs>
+          <circle class="ring-track"    cx="136" cy="136" r="128"/>
+          <circle class="ring-progress" id="ringProg" cx="136" cy="136" r="128"/>
+        </svg>
+        <div class="orb" id="orb"></div>
+      </div>
+
+    </div>
+
+    <div class="hint-wrap" id="hintWrap">
+      <p class="hint-main">pressione e segure até ela explodir</p>
+      <p class="hint-sub">uma mensagem especial te espera ✦</p>
+    </div>
+  </div>
+
+  <!-- Message overlay -->
+  <div class="msg-overlay" id="msgOverlay">
+    <div class="msg-backdrop"></div>
+    <div class="msg-card" id="msgCard">
+      <div class="msg-orb"></div>
+      <span class="msg-quote-mark">"</span>
+      <p class="msg-text" id="msgText"></p>
+      <div class="msg-line"></div>
+      <span class="msg-label">para você ✦</span>
+      <div class="msg-actions">
+        <button class="share-btn-main" id="shareBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          compartilhar
+        </button>
+        <button class="msg-btn" id="msgBtn">← nova mensagem</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Share card preview overlay -->
+  <div class="share-overlay" id="shareOverlay">
+    <div class="share-card-wrap" id="shareCardWrap">
+      <button class="share-close-btn" id="closeShareBtn">fechar</button>
+      <canvas id="shareCanvas" width="900" height="900"></canvas>
+      <div class="share-actions">
+        <button class="share-action-btn primary" id="phizShareBtn">compartilhar</button>
+        <button class="share-action-btn ghost"   id="copyShareBtn">copiar</button>
+      </div>
+      <p class="share-tip" id="shareTip"></p>
+    </div>
+  </div>
+
+  <script>
+    /* ─── MESSAGE POOL (1100+ mensagens únicas) ────────────── */
+    function buildMessagePool() {
+
+      /* 70 mensagens artesanais */
+      const BASE = [
+        "Você é mais forte do que imagina. Cada passo te aproxima do seu sonho.",
+        "Seu tempo vai chegar. Confie no processo e continue brilhando.",
+        "A vida recompensa quem persiste. Você está mais perto do que pensa.",
+        "Você foi feito para coisas extraordinárias. Acredite nisso.",
+        "Cada dia é uma nova chance de ser a melhor versão de você.",
+        "Sua presença faz diferença. Você importa mais do que imagina.",
+        "As dificuldades de hoje moldam a força de amanhã. Não desista.",
+        "Você carrega dentro de si tudo que precisa. Confie nisso.",
+        "O universo conspira a favor de quem acredita em si mesmo.",
+        "Respira. Você está exatamente onde precisa estar.",
+        "Sua história ainda não acabou. O melhor capítulo vem agora.",
+        "Você é luz. Não deixe ninguém apagar o que brilha em você.",
+        "Tudo que você viveu te preparou para o que está por vir.",
+        "Você não precisa ser perfeito para ser incrível. Já é.",
+        "Pequenas vitórias também merecem ser celebradas.",
+        "O amor que você dá ao mundo merece voltar para você.",
+        "Você tem coragem. Talvez não perceba, mas tem.",
+        "Cada vez que você levanta depois de cair, se torna maior.",
+        "Não compare sua jornada. A sua é única e suficiente.",
+        "Você importa. Não pelo que faz — por quem você é.",
+        "Existe algo em você que o mundo ainda não viu. Continue.",
+        "Ser gentil consigo mesmo é um ato de bravura.",
+        "Você não está sozinho, mesmo quando parece que está.",
+        "Cada manhã é um convite para recomeçar. Aceite.",
+        "Sua sensibilidade é força, não fraqueza.",
+        "Você já superou coisas que pareciam impossíveis antes.",
+        "Confiar em si mesmo é o primeiro passo para tudo.",
+        "Ninguém no mundo pensa exatamente como você. Isso é raro.",
+        "Às vezes descansar é o ato mais produtivo que existe.",
+        "Você não precisa de aprovação para ser quem é.",
+        "O mundo fica melhor com você nele.",
+        "Você planta sementes. Elas florescem no tempo certo.",
+        "Não subestime o quanto você inspirou alguém hoje.",
+        "Errar faz parte. O que importa é que você continua.",
+        "Existe uma calma dentro de você que nenhuma tempestade apaga.",
+        "Você é digno de tudo que deseja.",
+        "A vida conspira a seu favor, mesmo quando parece ao contrário.",
+        "Você já é suficiente — agora, exatamente como está.",
+        "Coisas grandes nascem de pequenos momentos de coragem.",
+        "Há uma força silenciosa em você que move montanhas.",
+        "O que parece impossível hoje será sua conquista amanhã.",
+        "Cada versão de você teve seu propósito. Essa também tem.",
+        "Você não precisa ter tudo resolvido para merecer paz.",
+        "Você tem mais aliados do que imagina. O universo é um deles.",
+        "O que você sente é válido. Sempre.",
+        "Existe grandeza em continuar mesmo sem garantias.",
+        "Tudo que você precisa já está dentro de você.",
+        "Você nasceu com um dom que só você pode dar ao mundo.",
+        "Há beleza em cada parte de quem você é.",
+        "Você sobreviveu a cada um dos seus dias difíceis.",
+        "A sua presença é um presente. Nunca se esqueça disso.",
+        "Você é a prova viva de que é possível seguir em frente.",
+        "Às vezes o maior ato de coragem é simplesmente aparecer.",
+        "O que você está construindo hoje alguém vai agradecer.",
+        "Você é mais do que seus erros e mais do que suas vitórias.",
+        "Cada lágrima que você derramou foi honesta e necessária.",
+        "Você não veio até aqui por acidente — veio por propósito.",
+        "O mundo precisa do que só você pode oferecer.",
+        "Você é a soma de tudo que sobreviveu — e isso é imenso.",
+        "Sua existência já mudou histórias sem que você saiba.",
+        "Você tem um ritmo próprio — e ele é o ritmo certo para você.",
+        "Há pessoas que se tornaram melhores por causa de você.",
+        "Você merece dar a si mesmo o benefício da dúvida.",
+        "Não existe jornada igual à sua no mundo inteiro.",
+        "O silêncio entre seus passos também faz parte da dança.",
+        "Nada do que você viveu foi desperdiçado.",
+        "Você pode não entender tudo agora, mas vai entender.",
+        "Seu coração sabe o caminho — ouça-o mais.",
+        "Você tem tudo que precisa para dar o próximo passo.",
+        "A vida não te trouxe até aqui por acidente."
+      ];
+
+      /* Generator 1 — "Você [predicado]" (80 combinações) */
+      const VP = [
+        "merece receber tudo o que dá ao mundo.",
+        "tem dentro de si um universo inteiro por descobrir.",
+        "é capaz de coisas que ainda nem imaginou.",
+        "foi feito para deixar uma marca que só você pode deixar.",
+        "nunca precisou de permissão para ser quem é.",
+        "já fez diferença na vida de alguém sem saber.",
+        "tem uma força silenciosa que move o que parece imóvel.",
+        "não precisa ser perfeito para ser extraordinário.",
+        "é mais corajoso do que se dá crédito.",
+        "tem o direito de ocupar espaço no mundo.",
+        "foi escolhido para essa história exatamente como é.",
+        "já sobreviveu a 100% dos seus dias difíceis.",
+        "carrega dentro de si a resposta para o que procura.",
+        "é a versão mais corajosa de quem você já foi.",
+        "tem um jeito de ser que ninguém mais tem.",
+        "merece se olhar com a gentileza que olha os outros.",
+        "é suficiente — agora, exatamente como você está.",
+        "não precisa conquistar tudo de uma vez.",
+        "está crescendo, mesmo nos momentos que não percebe.",
+        "tem uma história que vale ser contada.",
+        "não está aqui por acidente — está aqui por propósito.",
+        "inspira pessoas sem fazer ideia de que inspira.",
+        "importa mais do que qualquer número poderia medir.",
+        "é feito de resiliência — mesmo quando não sente isso.",
+        "tem tudo que precisa para dar o próximo passo.",
+        "merece um amor que começa por você mesmo.",
+        "não precisa de aprovação para existir plenamente.",
+        "é a prova de que é possível recomeçar.",
+        "tem uma gentileza rara que o mundo precisa mais.",
+        "já chegou longe demais para duvidar agora.",
+        "está sendo moldado por cada experiência que vive.",
+        "não está sozinho, mesmo quando parece que está.",
+        "tem um propósito que vai além do que enxerga agora.",
+        "é exatamente quem deveria estar aqui nesse momento.",
+        "merece paz — verdadeira, profunda e duradoura.",
+        "não precisa ter tudo resolvido para merecer alegria.",
+        "é mais do que os seus dias difíceis.",
+        "tem uma luz que não se apaga com as tempestades.",
+        "merece celebrar cada conquista, por menor que seja.",
+        "está no caminho certo, mesmo que pareça incerto.",
+        "não precisa entender tudo para confiar em si mesmo.",
+        "tem o poder de transformar o que toca.",
+        "é a soma de toda coragem que acumulou até aqui.",
+        "merece sonhar alto e acreditar que é possível.",
+        "não precisa comparar sua jornada com a de ninguém.",
+        "tem uma sabedoria que foi ganhando com o tempo.",
+        "é capaz de recomeçar quantas vezes forem necessárias.",
+        "merece se tratar com a gentileza que trata quem ama.",
+        "não precisa apressar o que está sendo construído com cuidado.",
+        "tem um valor que não depende do que os outros pensam.",
+        "é a resposta para uma pergunta que alguém ainda vai fazer.",
+        "merece ter seus limites respeitados — começando por você.",
+        "não precisa diminuir quem é para caber em lugar nenhum.",
+        "tem uma essência que nenhuma circunstância pode tirar.",
+        "é mais forte do que os momentos que tentaram te quebrar.",
+        "merece ter dias leves e coração tranquilo.",
+        "não está atrasado — cada um tem seu tempo.",
+        "tem muito mais a oferecer do que imagina.",
+        "é feito de histórias que merecem ser honradas.",
+        "merece receber o mesmo amor que distribui.",
+        "tem uma presença que aquece os ambientes que entra.",
+        "é capaz de mover o que parece imóvel.",
+        "merece confiar em si mesmo um pouco mais a cada dia.",
+        "tem um ritmo próprio — e ele é o ritmo certo para você.",
+        "merece ser grato por si mesmo, não só pelos seus feitos.",
+        "tem exatamente o que precisa para o próximo capítulo.",
+        "é o resultado de tudo que escolheu enfrentar com coragem.",
+        "não precisa fingir que está bem quando não está.",
+        "tem uma alma que foi tecida com cuidado pelo universo.",
+        "é capaz de encontrar beleza mesmo nos lugares improváveis.",
+        "merece acreditar em si com a intensidade que acredita nos outros.",
+        "não precisa esperar chegar lá para ser feliz no caminho.",
+        "tem dentro de si tudo que precisa para florescer.",
+        "é exatamente a pessoa que alguém precisava cruzar na vida.",
+        "merece escrever uma história que te orgulhe.",
+        "tem uma voz que merece ser ouvida — use-a.",
+        "não precisa de tragédias para provar sua força.",
+        "carrega uma sabedoria que vai além da sua idade.",
+        "merece cada segundo de paz que encontrar.",
+        "tem a capacidade de transformar dor em propósito."
+      ];
+      const gen1 = VP.map(p => 'Você ' + p);
+
+      /* Generator 2 — "Sua [substantivo] [predicado]" (15×22 = 330) */
+      const SUA_N = ['força','coragem','presença','história','voz','alma',
+                     'intuição','bondade','energia','determinação',
+                     'sensibilidade','criatividade','resiliência','essência','luz'];
+      const SUA_P = [
+        'é maior do que você imagina.',
+        'merece ser reconhecida e celebrada.',
+        'é um presente para quem te conhece.',
+        'nunca passou despercebida.',
+        'importa mais do que você percebe.',
+        'tem um poder que você ainda vai descobrir.',
+        'é exatamente o que esse momento precisa.',
+        'já transformou mais do que você sabe.',
+        'é suficiente exatamente como está.',
+        'cresce a cada desafio que você enfrenta.',
+        'é uma dádiva — mesmo quando você não percebe.',
+        'é o que te faz único neste mundo.',
+        'tem raízes mais profundas do que imagina.',
+        'é a prova de que você chegou longe.',
+        'é um tesouro que muitos ainda vão descobrir.',
+        'diz muito sobre quem você é.',
+        'é capaz de mudar histórias.',
+        'carrega uma sabedoria que poucos têm.',
+        'merece ser tratada com mais gentileza por você.',
+        'está sendo construída todos os dias.',
+        'é rara e preciosa.',
+        'brilha, mesmo quando você duvida dela.'
+      ];
+      const gen2 = [];
+      SUA_N.forEach(n => SUA_P.forEach(p => gen2.push(`Sua ${n} ${p}`)));
+
+      /* Generator 3 — "Seu [substantivo] [predicado]" (10×22 = 220) */
+      const SEU_N = ['coração','esforço','caminho','talento','sorriso',
+                     'tempo','valor','jeito','olhar','propósito'];
+      const SEU_P = [
+        'é mais precioso do que você imagina.',
+        'merece ser valorizado e respeitado.',
+        'nunca passou despercebido.',
+        'importa mais do que você sabe.',
+        'é capaz de mudar o dia de alguém.',
+        'carrega uma história linda.',
+        'tem um poder especial.',
+        'é exatamente o que esse mundo precisa.',
+        'já fez mais do que você reconhece.',
+        'é suficiente exatamente como é.',
+        'cresce a cada experiência vivida.',
+        'é uma dádiva para quem te conhece.',
+        'merece ser celebrado por você mesmo.',
+        'é o que te torna único.',
+        'tem raízes mais fortes do que imagina.',
+        'é a prova de que você chegou longe.',
+        'está ficando mais forte a cada dia.',
+        'é um presente que você dá ao mundo.',
+        'tem uma luz própria.',
+        'diz muito sobre o ser humano que você é.',
+        'é raro e merece ser honrado.',
+        'transforma tudo ao redor.'
+      ];
+      const gen3 = [];
+      SEU_N.forEach(n => SEU_P.forEach(p => gen3.push(`Seu ${n} ${p}`)));
+
+      /* Generator 4 — [abertura] + [encerramento] (28×22 = 616) */
+      const OPEN = [
+        'Você chegou longe demais para desistir agora.',
+        'Não existe jornada igual à sua no mundo inteiro.',
+        'Tudo que você passou até aqui teve um motivo.',
+        'O universo não te coloca onde você não consegue suportar.',
+        'Você já superou tudo que parecia impossível antes.',
+        'Há pessoas que se tornaram melhores por causa de você.',
+        'Nada do que você viveu foi desperdiçado.',
+        'Você plantou sementes que ainda vão florescer.',
+        'Sua existência já mudou histórias sem que você saiba.',
+        'O que você está construindo hoje alguém vai agradecer.',
+        'Você é mais do que seus erros e mais do que suas vitórias.',
+        'Cada lágrima que você derramou foi honesta e necessária.',
+        'Você tem dentro de você todos os recursos que precisa.',
+        'A vida não te trouxe até aqui por acidente.',
+        'O mundo precisa do que só você pode oferecer.',
+        'Sua jornada tem um valor que vai além do que você vê.',
+        'Você é a soma de tudo que sobreviveu — e isso é imenso.',
+        'O que você carrega é mais forte que qualquer obstáculo.',
+        'Tudo que você está vivendo faz parte de algo maior.',
+        'Você não precisou de ninguém para ser quem é.',
+        'Há uma beleza em você que não depende das circunstâncias.',
+        'Cada amanhecer que você encontrou foi uma escolha corajosa.',
+        'Você tem dentro de si uma chama que nada apaga.',
+        'Cada cicatriz sua é também uma prova de superação.',
+        'O que parece um desvio muitas vezes é o caminho certo.',
+        'Você está sendo guiado, mesmo que não perceba.',
+        'Algo lindo está sendo construído com cada passo seu.',
+        'O seu momento chegará — e vai fazer sentido.'
+      ];
+      const CLOSE = [
+        ' Continue confiando.',
+        ' Siga em frente.',
+        ' Você merece isso.',
+        ' Acredite.',
+        ' Confie no processo.',
+        ' O melhor está por vir.',
+        ' Você consegue.',
+        ' Não esqueça disso.',
+        ' Respire e continue.',
+        ' Você não está sozinho.',
+        ' Há luz no fim desse caminho.',
+        ' Continue do seu jeito.',
+        ' Você já fez isso antes.',
+        ' Isso faz parte da sua história.',
+        ' Você está mais perto do que pensa.',
+        ' Confie em você.',
+        ' Esse é o seu momento.',
+        ' Continue brilhando.',
+        ' Cada passo conta.',
+        ' Você vale a pena.',
+        ' Tudo faz sentido no tempo certo.',
+        ' Sua hora chegará.'
+      ];
+      const gen4 = [];
+      OPEN.forEach(o => CLOSE.forEach(c => gen4.push(o + c)));
+
+      return [...BASE, ...gen1, ...gen2, ...gen3, ...gen4];
+    }
+
+    const MESSAGES = buildMessagePool(); // ~1296 mensagens únicas
+
+    /* ─── SHUFFLE (Fisher-Yates) ────────────────────────────── */
+    function shuffle(arr) {
+      const a = [...arr];
+      for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+      }
+      return a;
+    }
+    let shuffled = shuffle(MESSAGES);
+    let msgIndex = 0;
+
+    /* ─── STATE ─────────────────────────────────────────────── */
+    let holding    = false;
+    let holdStart  = 0;
+    let rafId      = null;
+    let completed  = false;
+    const HOLD_MS  = 2500;
+
+    /* ─── ELEMENTS ──────────────────────────────────────────── */
+    const orbArea    = document.getElementById('orbArea');
+    const orb        = document.getElementById('orb');
+    const floater    = document.getElementById('floater');
+    const ambient    = document.getElementById('ambient');
+    const ringSvg    = document.getElementById('ringSvg');
+    const ringProg   = document.getElementById('ringProg');
+    const eyebrow    = document.getElementById('eyebrow');
+    const hintWrap   = document.getElementById('hintWrap');
+    const msgOverlay = document.getElementById('msgOverlay');
+    const msgText    = document.getElementById('msgText');
+    const msgBtn     = document.getElementById('msgBtn');
+    const flash      = document.getElementById('flash');
+    const particles  = document.getElementById('particles');
+
+    /* ─── RING SETUP ────────────────────────────────────────── */
+    const R   = 128;
+    const C   = 2 * Math.PI * R;
+    ringProg.style.strokeDasharray  = C;
+    ringProg.style.strokeDashoffset = C;
+
+    function setRingProgress(p) {
+      ringProg.style.strokeDashoffset = C - (p * C);
+    }
+
+    /* ─── HOLD LOGIC ────────────────────────────────────────── */
+    function onHoldStart(e) {
+      if (completed) return;
+      e.preventDefault();
+      holding   = true;
+      holdStart = performance.now();
+
+      floater.classList.add('paused');
+      orb.classList.add('is-holding');
+      ringSvg.classList.add('show');
+      eyebrow.classList.add('fade');
+      hintWrap.classList.add('fade');
+
+      ambient.style.opacity = '0.7';
+      ambient.style.width   = '250px';
+      ambient.style.height  = '250px';
+      ambient.style.filter  = 'blur(50px)';
+
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function tick(now) {
+      if (!holding) return;
+      const elapsed = now - holdStart;
+      const p = Math.min(elapsed / HOLD_MS, 1);
+      setRingProgress(p);
+
+      if (p >= 1) {
+        explode();
+        return;
+      }
+      rafId = requestAnimationFrame(tick);
+    }
+
+    function onHoldEnd() {
+      if (!holding || completed) return;
+      holding = false;
+      cancelAnimationFrame(rafId);
+      setRingProgress(0);
+
+      floater.classList.remove('paused');
+      orb.classList.remove('is-holding');
+      ringSvg.classList.remove('show');
+      eyebrow.classList.remove('fade');
+      hintWrap.classList.remove('fade');
+
+      ambient.style.opacity = '0.35';
+      ambient.style.width   = '200px';
+      ambient.style.height  = '200px';
+      ambient.style.filter  = 'blur(36px)';
+    }
+
+    /* ─── EXPLOSION ─────────────────────────────────────────── */
+    function explode() {
+      holding   = false;
+      completed = true;
+      cancelAnimationFrame(rafId);
+      setRingProgress(1);
+
+      ringSvg.classList.remove('show');
+      orb.classList.remove('is-holding');
+      orb.classList.add('is-exploding');
+
+      // Flash
+      flash.classList.add('pop');
+      setTimeout(() => flash.classList.remove('pop'), 180);
+
+      // Particles
+      spawnParticles();
+
+      // Reveal message
+      setTimeout(showMessage, 580);
+    }
+
+    /* ─── PARTICLES ─────────────────────────────────────────── */
+    const COLORS  = ['#c084fc','#818cf8','#60a5fa','#f472b6','#ffffff','#d0b8ff','#a5b4fc'];
+    const EASINGS = [
+      'cubic-bezier(0,0.9,0.57,1)',
+      'cubic-bezier(0.2,1,0.6,1)',
+      'ease-out'
+    ];
+
+    function spawnParticles() {
+      const cx = window.innerWidth  / 2;
+      const cy = window.innerHeight / 2;
+      const N  = 55;
+
+      for (let i = 0; i < N; i++) {
+        const el   = document.createElement('div');
+        el.className = 'p';
+
+        const size  = Math.random() * 14 + 4;
+        const angle = (i / N) * 360 + (Math.random() - 0.5) * (360 / N) * 1.5;
+        const dist  = Math.random() * 280 + 80;
+        const tx    = Math.cos(angle * Math.PI / 180) * dist;
+        const ty    = Math.sin(angle * Math.PI / 180) * dist;
+        const dur   = Math.random() * 500 + 500;
+        const delay = Math.random() * 80;
+        const color = COLORS[Math.floor(Math.random() * COLORS.length)];
+        const ease  = EASINGS[Math.floor(Math.random() * EASINGS.length)];
+
+        el.style.cssText = `
+          width:  ${size}px;
+          height: ${size}px;
+          left:   ${cx - size/2}px;
+          top:    ${cy - size/2}px;
+          background: ${color};
+          box-shadow: 0 0 ${size*1.5}px ${color};
+          --tx: ${tx}px;
+          --ty: ${ty}px;
+          --d:  ${dur}ms;
+          --ease: ${ease};
+          --delay: ${delay}ms;
+        `;
+
+        particles.appendChild(el);
+        setTimeout(() => el.remove(), dur + delay + 50);
+      }
+    }
+
+    /* ─── SPARKLES ──────────────────────────────────────────── */
+    const SPARKS  = ['✦','✧','★','◆','✨','·'];
+    const SCOLS   = ['#c084fc','#818cf8','#60a5fa','#f472b6'];
+
+    function spawnSparkles() {
+      const count = 12;
+      for (let i = 0; i < count; i++) {
+        const el  = document.createElement('div');
+        el.className = 'spark';
+        const fs  = Math.random() * 14 + 8;
+        const dur = 1.8 + Math.random() * 1.2;
+        el.textContent = SPARKS[Math.floor(Math.random() * SPARKS.length)];
+        el.style.cssText = `
+          left: ${10 + Math.random() * 80}%;
+          top:  ${5  + Math.random() * 85}%;
+          --fs:  ${fs}px;
+          --c:   ${SCOLS[Math.floor(Math.random() * SCOLS.length)]};
+          --dur: ${dur}s;
+          animation-delay: ${Math.random() * 0.6}s;
+        `;
+        document.body.appendChild(el);
+        setTimeout(() => el.remove(), (dur + 0.6) * 1000 + 100);
+      }
+    }
+
+    /* ─── SHOW MESSAGE ──────────────────────────────────────── */
+    let sparkIntervalId = null;
+
+    function showMessage() {
+      const msg = shuffled[msgIndex];
+      msgText.textContent = msg;
+      msgOverlay.classList.add('show');
+      spawnSparkles();
+
+      clearInterval(sparkIntervalId);
+      sparkIntervalId = setInterval(() => {
+        if (!msgOverlay.classList.contains('show')) { clearInterval(sparkIntervalId); return; }
+        spawnSparkles();
+      }, 2800);
+    }
+
+    /* ─── RESET ─────────────────────────────────────────────── */
+    function reset() {
+      clearInterval(sparkIntervalId);
+      msgOverlay.classList.remove('show');
+
+      setTimeout(() => {
+        completed = false;
+        orb.classList.remove('is-exploding');
+        orb.style.animation = 'none';
+        void orb.offsetWidth;
+        orb.style.animation = '';
+        orb.classList.add('reforming');
+
+        floater.classList.remove('paused');
+        eyebrow.classList.remove('fade');
+        hintWrap.classList.remove('fade');
+        ambient.style.opacity = '0.35';
+        ambient.style.width   = '200px';
+        ambient.style.height  = '200px';
+        ambient.style.filter  = 'blur(36px)';
+        setRingProgress(0);
+
+        msgIndex++;
+        if (msgIndex >= shuffled.length) {
+          shuffled = shuffle(MESSAGES); // reshuffle ao esgotar
+          msgIndex = 0;
+        }
+
+        setTimeout(() => orb.classList.remove('reforming'), 1000);
+      }, 450);
+    }
+
+    /* ─── SHARE CARD ────────────────────────────────────────── */
+    const APP_NAME = 'Aura';
+    const shareOverlay  = document.getElementById('shareOverlay');
+    const shareCanvas   = document.getElementById('shareCanvas');
+    const copyShareBtn  = document.getElementById('copyShareBtn');
+    const phizShareBtn  = document.getElementById('phizShareBtn');
+    const closeShareBtn = document.getElementById('closeShareBtn');
+    const shareTip      = document.getElementById('shareTip');
+    const shareBtn      = document.getElementById('shareBtn');
+
+    function wrapText(ctx, text, x, y, maxW, lineH) {
+      const words = text.split(' ');
+      let line = '';
+      const lines = [];
+      words.forEach(w => {
+        const test = line ? line + ' ' + w : w;
+        if (ctx.measureText(test).width > maxW && line) {
+          lines.push(line);
+          line = w;
+        } else { line = test; }
+      });
+      if (line) lines.push(line);
+      const total = lines.length * lineH;
+      const startY = y - total / 2 + lineH / 2;
+      lines.forEach((l, i) => ctx.fillText(l, x, startY + i * lineH));
+      return lines.length;
+    }
+
+    function drawShareCard(message) {
+      const C = shareCanvas;
+      const ctx = C.getContext('2d');
+      const W = C.width, H = C.height;
+
+      // Background — dark rich com cores do logo Aura
+      const bg = ctx.createLinearGradient(0, 0, W, H);
+      bg.addColorStop(0,   '#0d0520');
+      bg.addColorStop(0.5, '#100828');
+      bg.addColorStop(1,   '#050318');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // Ambient blobs — roxo, azul, pink (cores do logo)
+      const blobColors = [
+        ['rgba(192,132,252,0.25)', W*0.1,  H*0.15, 320],  // roxo
+        ['rgba(96,165,250,0.20)',  W*0.88, H*0.12, 280],  // azul
+        ['rgba(244,114,182,0.22)', W*0.5,  H*0.9,  300],  // pink
+      ];
+      blobColors.forEach(([c, bx, by, r]) => {
+        const g = ctx.createRadialGradient(bx, by, 0, bx, by, r);
+        g.addColorStop(0, c);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, W, H);
+      });
+
+      // Decorative orb — cores do logo Aura
+      const ox = W / 2, oy = H * 0.22;
+      const orbG = ctx.createConicGradient(0, ox, oy);
+      orbG.addColorStop(0,    '#c084fc');
+      orbG.addColorStop(0.33, '#60a5fa');
+      orbG.addColorStop(0.66, '#818cf8');
+      orbG.addColorStop(0.85, '#f472b6');
+      orbG.addColorStop(1,    '#c084fc');
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(ox, oy, 72, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = orbG;
+      ctx.fillRect(ox - 72, oy - 72, 144, 144);
+      // Shine
+      const shine = ctx.createRadialGradient(ox-22, oy-22, 0, ox, oy, 72);
+      shine.addColorStop(0, 'rgba(255,255,255,0.45)');
+      shine.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = shine;
+      ctx.fillRect(ox - 72, oy - 72, 144, 144);
+      ctx.restore();
+      // Orb glow — roxo/azul Aura
+      const glowG = ctx.createRadialGradient(ox, oy, 0, ox, oy, 150);
+      glowG.addColorStop(0, 'rgba(129,140,248,0.35)');
+      glowG.addColorStop(0.5, 'rgba(192,132,252,0.15)');
+      glowG.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = glowG;
+      ctx.fillRect(0, 0, W, H);
+
+      // Quote mark
+      ctx.font = 'italic 700 88px Georgia, serif';
+      ctx.fillStyle = 'rgba(196,113,237,0.25)';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u201C', W / 2, H * 0.47);
+
+      // Message text — fonte maior, mais presença
+      ctx.font = 'italic 600 42px Georgia, serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.95)';
+      ctx.textAlign = 'center';
+      wrapText(ctx, message, W / 2, H * 0.60, W * 0.80, 60);
+
+      // Divider line — gradiente Aura
+      const lx = W / 2;
+      const ly = H * 0.83;
+      const grad2 = ctx.createLinearGradient(lx - 50, ly, lx + 50, ly);
+      grad2.addColorStop(0, '#c084fc');
+      grad2.addColorStop(0.5, '#818cf8');
+      grad2.addColorStop(1, '#60a5fa');
+      ctx.strokeStyle = grad2;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(lx - 40, ly);
+      ctx.lineTo(lx + 40, ly);
+      ctx.stroke();
+
+      // App badge
+      ctx.font = '500 22px -apple-system, Inter, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.45)';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u2746 ' + APP_NAME + '  \u00B7  Phiz MiniApp', W / 2, H * 0.91);
+    }
+
+    async function openShareCard() {
+      const message = shuffled[msgIndex];
+      await document.fonts.ready;
+      drawShareCard(message);
+      shareOverlay.classList.add('show');
+      // Mostra dica apenas no fallback (browser sem Phiz)
+      if (typeof pz === 'undefined') {
+        shareTip.textContent = 'copie a imagem e cole no chat';
+      } else {
+        shareTip.textContent = '';
+      }
+    }
+
+    function closeShareCard() {
+      shareOverlay.classList.remove('show');
+    }
+
+    // Botão "compartilhar" dentro do card: usa Phiz nativo se disponível,
+    // senão Web Share API com a imagem, senão baixa o arquivo.
+    async function phizShareFromCard() {
+      if (typeof pz !== 'undefined' && pz.showShareMenu) {
+        closeShareCard();
+        pz.showShareMenu();
+        return;
+      }
+      // Web Share API com imagem
+      try {
+        shareCanvas.toBlob(async blob => {
+          const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
+          if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              title: '\u2746 ' + APP_NAME,
+              text: '\u201C' + shuffled[msgIndex] + '\u201D',
+              files: [file]
+            });
+          } else {
+            // Fallback: copia para clipboard
+            copyShareImage();
+          }
+        }, 'image/png');
+      } catch(e) { /* cancelado pelo usuário */ }
+    }
+
+    async function copyShareImage() {
+      try {
+        shareCanvas.toBlob(async blob => {
+          if (navigator.clipboard && window.ClipboardItem) {
+            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+            copyShareBtn.textContent = 'copiado! ✦';
+            setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
+          } else {
+            const a = document.createElement('a');
+            a.download = APP_NAME.toLowerCase() + '-mensagem.png';
+            a.href = shareCanvas.toDataURL('image/png');
+            a.click();
+          }
+        }, 'image/png');
+      } catch(e) {
+        const msg = shuffled[msgIndex];
+        if (navigator.share) {
+          navigator.share({ title: '\u2746 ' + APP_NAME, text: '"' + msg + '"\n\n\u2014 ' + APP_NAME + ' \u00B7 Phiz MiniApp' });
+        }
+      }
+    }
+
+    /* ─── PHIZ NATIVE SHARE ─────────────────────────────────── */
+    // onShareAppMessage é chamado pelo SDK Phiz quando o usuário
+    // toca no botão de compartilhar nativo (via pz.showShareMenu)
+    // Retorna o conteúdo do card que será enviado no chat.
+    if (typeof pz !== 'undefined') {
+      pz.onShareAppMessage = function() {
+        const msg = shuffled[msgIndex];
+        return {
+          title: '\u2746 ' + APP_NAME,
+          desc: '\u201C' + msg + '\u201D',
+          // imageUrl: hospede um thumbnail e coloque a URL aqui
+        };
+      };
+    }
+
+    function handleShare() {
+      if (typeof pz !== 'undefined' && pz.showShareMenu) {
+        // Dentro do Phiz: abre o share nativo para enviar ao chat
+        pz.showShareMenu();
+      } else {
+        // Fora do Phiz (browser): mostra o card canvas para copiar
+        openShareCard();
+      }
+    }
+
+    shareBtn.addEventListener('click', handleShare);
+    shareBtn.addEventListener('touchend', e => { e.preventDefault(); handleShare(); });
+    phizShareBtn.addEventListener('click', phizShareFromCard);
+    phizShareBtn.addEventListener('touchend', e => { e.preventDefault(); phizShareFromCard(); });
+    copyShareBtn.addEventListener('click', copyShareImage);
+    copyShareBtn.addEventListener('touchend', e => { e.preventDefault(); copyShareImage(); });
+    closeShareBtn.addEventListener('click', closeShareCard);
+    closeShareBtn.addEventListener('touchend', e => { e.preventDefault(); closeShareCard(); });
+
+    /* ─── EVENTS ─────────────────────────────────────────────── */
+    orbArea.addEventListener('mousedown',  onHoldStart);
+    orbArea.addEventListener('touchstart', onHoldStart, { passive: false });
+
+    document.addEventListener('mouseup',    onHoldEnd);
+    document.addEventListener('touchend',   onHoldEnd);
+    document.addEventListener('touchcancel',onHoldEnd);
+
+    msgBtn.addEventListener('click',    reset);
+    msgBtn.addEventListener('touchend', (e) => { e.preventDefault(); reset(); });
+
+    /* ─── FAVICON dinâmico — logo Aura ─────────────────────── */
+    (function generateFavicon() {
+      const c = document.createElement('canvas');
+      c.width = c.height = 128;
+      const x = c.getContext('2d');
+      const cx = 64, cy = 64, r = 58;
+
+      // Sombra suave
+      const shadow = x.createRadialGradient(cx, cy+62, 0, cx, cy+62, 42);
+      shadow.addColorStop(0, 'rgba(129,140,248,0.25)');
+      shadow.addColorStop(1, 'rgba(0,0,0,0)');
+      x.fillStyle = shadow;
+      x.fillRect(0, 0, 128, 128);
+
+      // Clip circular
+      x.save();
+      x.beginPath();
+      x.arc(cx, cy, r, 0, Math.PI*2);
+      x.clip();
+
+      // Camada 1: base roxo→azul
+      const g1 = x.createLinearGradient(0, 0, 128, 128);
+      g1.addColorStop(0,    '#b39af5');
+      g1.addColorStop(0.5,  '#818cf8');
+      g1.addColorStop(1,    '#60a5fa');
+      x.fillStyle = g1;
+      x.fillRect(0, 0, 128, 128);
+
+      // Camada 2: pink/magenta do centro-baixo
+      const g2 = x.createRadialGradient(cx, cy+30, 0, cx, cy+30, 72);
+      g2.addColorStop(0,   'rgba(244,114,182,0.92)');
+      g2.addColorStop(0.45,'rgba(244,114,182,0.55)');
+      g2.addColorStop(1,   'rgba(244,114,182,0)');
+      x.fillStyle = g2;
+      x.fillRect(0, 0, 128, 128);
+
+      // Camada 3: destaque branco central (efeito de luz)
+      const g3 = x.createRadialGradient(cx, cy+8, 0, cx, cy, 30);
+      g3.addColorStop(0,   'rgba(255,255,255,0.65)');
+      g3.addColorStop(0.5, 'rgba(255,255,255,0.2)');
+      g3.addColorStop(1,   'rgba(255,255,255,0)');
+      x.fillStyle = g3;
+      x.fillRect(0, 0, 128, 128);
+
+      x.restore();
+
+      const link = document.getElementById('favicon');
+      link.href = c.toDataURL('image/png');
+    })();
+  </script>
+</body>
+</html>
