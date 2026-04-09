@@ -996,6 +996,144 @@
       ringProg.style.strokeDashoffset = C - (p * C);
     }
 
+    /* ─── AUDIO ENGINE ──────────────────────────────────────── */
+    let audioCtx  = null;
+    let holdOsc   = null;
+    let holdGain  = null;
+    let holdFilter = null;
+
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      return audioCtx;
+    }
+
+    function startHoldSound() {
+      try {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+        const dur = HOLD_MS / 1000;
+
+        // Filtro passa-baixa que se abre com o progresso
+        holdFilter = ctx.createBiquadFilter();
+        holdFilter.type = 'bandpass';
+        holdFilter.frequency.setValueAtTime(300, now);
+        holdFilter.frequency.linearRampToValueAtTime(1800, now + dur);
+        holdFilter.Q.setValueAtTime(1.5, now);
+
+        // Oscilador principal — sobe do grave ao agudo
+        holdOsc = ctx.createOscillator();
+        holdOsc.type = 'sine';
+        holdOsc.frequency.setValueAtTime(130, now);
+        holdOsc.frequency.linearRampToValueAtTime(520, now + dur);
+
+        // Segundo oscilador harmônico — cria "tensão"
+        const holdOsc2 = ctx.createOscillator();
+        holdOsc2.type = 'triangle';
+        holdOsc2.frequency.setValueAtTime(195, now);
+        holdOsc2.frequency.linearRampToValueAtTime(780, now + dur);
+
+        const osc2Gain = ctx.createGain();
+        osc2Gain.gain.setValueAtTime(0.04, now);
+        osc2Gain.gain.linearRampToValueAtTime(0.09, now + dur);
+
+        holdGain = ctx.createGain();
+        holdGain.gain.setValueAtTime(0, now);
+        holdGain.gain.linearRampToValueAtTime(0.13, now + 0.25);
+
+        holdOsc.connect(holdFilter);
+        holdOsc2.connect(osc2Gain);
+        osc2Gain.connect(holdFilter);
+        holdFilter.connect(holdGain);
+        holdGain.connect(ctx.destination);
+
+        holdOsc.start(now);
+        holdOsc2.start(now);
+        holdOsc2.stop(now + dur + 0.2);
+        // holdOsc é parado manualmente em stopHoldSound
+      } catch(e) {}
+    }
+
+    function stopHoldSound(immediate) {
+      try {
+        if (holdOsc && audioCtx) {
+          if (immediate) {
+            holdGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.04);
+            holdOsc.stop(audioCtx.currentTime + 0.08);
+          } else {
+            holdGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.08);
+            holdOsc.stop(audioCtx.currentTime + 0.2);
+          }
+        }
+      } catch(e) {}
+      holdOsc = null; holdGain = null; holdFilter = null;
+    }
+
+    function playExplosionSound() {
+      try {
+        const ctx = getAudioCtx();
+        const now = ctx.currentTime;
+
+        // Master limiter/compressor
+        const comp = ctx.createDynamicsCompressor();
+        comp.threshold.value = -6;
+        comp.ratio.value = 4;
+        comp.connect(ctx.destination);
+
+        // Acorde alegre — Dó maior com extensão (C E G C E)
+        const chord = [523.25, 659.25, 783.99, 1046.5, 1318.5];
+        chord.forEach((freq, i) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq * 0.98, now + i * 0.04);
+          osc.frequency.linearRampToValueAtTime(freq, now + i * 0.04 + 0.08);
+          gain.gain.setValueAtTime(0, now + i * 0.04);
+          gain.gain.linearRampToValueAtTime(0.16 - i * 0.015, now + i * 0.04 + 0.05);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.8);
+          osc.connect(gain);
+          gain.connect(comp);
+          osc.start(now + i * 0.04);
+          osc.stop(now + i * 0.04 + 0.9);
+        });
+
+        // Cintilação — notas agudas em sequência ascendente
+        const sparkNotes = [2093, 2349, 2637, 3136, 4186];
+        sparkNotes.forEach((freq, i) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.value = freq;
+          gain.gain.setValueAtTime(0.07, now + 0.12 + i * 0.055);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12 + i * 0.055 + 0.35);
+          osc.connect(gain);
+          gain.connect(comp);
+          osc.start(now + 0.12 + i * 0.055);
+          osc.stop(now + 0.12 + i * 0.055 + 0.4);
+        });
+
+        // Ruído suave de "whoosh" na explosão
+        const bufSize = ctx.sampleRate * 0.15;
+        const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1);
+        const noise = ctx.createBufferSource();
+        noise.buffer = buf;
+        const noiseFilter = ctx.createBiquadFilter();
+        noiseFilter.type = 'highpass';
+        noiseFilter.frequency.value = 3000;
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.12, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        noise.connect(noiseFilter);
+        noiseFilter.connect(noiseGain);
+        noiseGain.connect(comp);
+        noise.start(now);
+      } catch(e) {}
+    }
+
     /* ─── HOLD LOGIC ────────────────────────────────────────── */
     function onHoldStart(e) {
       if (completed) return;
@@ -1014,6 +1152,7 @@
       ambient.style.height  = '250px';
       ambient.style.filter  = 'blur(50px)';
 
+      startHoldSound();
       rafId = requestAnimationFrame(tick);
     }
 
@@ -1046,6 +1185,8 @@
       ambient.style.width   = '200px';
       ambient.style.height  = '200px';
       ambient.style.filter  = 'blur(36px)';
+
+      stopHoldSound(false);
     }
 
     /* ─── EXPLOSION ─────────────────────────────────────────── */
@@ -1054,6 +1195,8 @@
       completed = true;
       cancelAnimationFrame(rafId);
       setRingProgress(1);
+      stopHoldSound(true);
+      playExplosionSound();
 
       ringSvg.classList.remove('show');
       orb.classList.remove('is-holding');
@@ -1273,17 +1416,11 @@
       ctx.fillStyle = glowG;
       ctx.fillRect(0, 0, W, H);
 
-      // Quote mark
-      ctx.font = 'italic 700 88px Georgia, serif';
-      ctx.fillStyle = 'rgba(196,113,237,0.25)';
-      ctx.textAlign = 'center';
-      ctx.fillText('\u201C', W / 2, H * 0.47);
-
-      // Message text — fonte maior, mais presença
-      ctx.font = 'italic 600 42px Georgia, serif';
+      // Message text — sem aspas, fonte maior, mais presença
+      ctx.font = 'italic 600 44px Georgia, serif';
       ctx.fillStyle = 'rgba(255,255,255,0.95)';
       ctx.textAlign = 'center';
-      wrapText(ctx, message, W / 2, H * 0.60, W * 0.80, 60);
+      wrapText(ctx, message, W / 2, H * 0.57, W * 0.80, 62);
 
       // Divider line — gradiente Aura
       const lx = W / 2;
@@ -1323,52 +1460,63 @@
       shareOverlay.classList.remove('show');
     }
 
-    // Botão "compartilhar" dentro do card: usa Phiz nativo se disponível,
-    // senão Web Share API com a imagem, senão baixa o arquivo.
+    // Compartilha a imagem canvas via Web Share API (funciona no webview do Phiz
+    // e em browsers modernos). Fallback: pz.showShareMenu → clipboard.
     async function phizShareFromCard() {
-      if (typeof pz !== 'undefined' && pz.showShareMenu) {
-        closeShareCard();
-        pz.showShareMenu();
-        return;
-      }
-      // Web Share API com imagem
-      try {
+      return new Promise(resolve => {
         shareCanvas.toBlob(async blob => {
           const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
+          // 1ª tentativa: Web Share API com arquivo de imagem
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-            await navigator.share({
-              title: '\u2746 ' + APP_NAME,
-              text: '\u201C' + shuffled[msgIndex] + '\u201D',
-              files: [file]
-            });
-          } else {
-            // Fallback: copia para clipboard
-            copyShareImage();
+            try {
+              await navigator.share({ title: '\u2746 ' + APP_NAME, files: [file] });
+              resolve(); return;
+            } catch(e) { /* usuário cancelou ou não suportado */ }
           }
+          // 2ª tentativa: Web Share API só com texto (sem arquivo)
+          if (navigator.share) {
+            try {
+              await navigator.share({
+                title: '\u2746 ' + APP_NAME,
+                text: shuffled[msgIndex] + '\n\n\u2014 ' + APP_NAME + ' \u00B7 Phiz MiniApp'
+              });
+              resolve(); return;
+            } catch(e) {}
+          }
+          // 3ª tentativa: Phiz nativo (compartilha link do mini app)
+          if (typeof pz !== 'undefined' && pz.showShareMenu) {
+            closeShareCard();
+            pz.showShareMenu();
+            resolve(); return;
+          }
+          // Último recurso: copia imagem para clipboard
+          copyShareImage();
+          resolve();
         }, 'image/png');
-      } catch(e) { /* cancelado pelo usuário */ }
+      });
     }
 
     async function copyShareImage() {
       try {
         shareCanvas.toBlob(async blob => {
+          // Tenta copiar a imagem para o clipboard
           if (navigator.clipboard && window.ClipboardItem) {
-            await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-            copyShareBtn.textContent = 'copiado! ✦';
-            setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
-          } else {
-            const a = document.createElement('a');
-            a.download = APP_NAME.toLowerCase() + '-mensagem.png';
-            a.href = shareCanvas.toDataURL('image/png');
-            a.click();
+            try {
+              await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+              copyShareBtn.textContent = 'copiado! ✦';
+              setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
+              return;
+            } catch(e) {}
           }
+          // Fallback: baixa a imagem como arquivo
+          const a = document.createElement('a');
+          a.download = APP_NAME.toLowerCase() + '-mensagem.png';
+          a.href = shareCanvas.toDataURL('image/png');
+          a.click();
+          copyShareBtn.textContent = 'salvo! ✦';
+          setTimeout(() => copyShareBtn.textContent = 'copiar', 2200);
         }, 'image/png');
-      } catch(e) {
-        const msg = shuffled[msgIndex];
-        if (navigator.share) {
-          navigator.share({ title: '\u2746 ' + APP_NAME, text: '"' + msg + '"\n\n\u2014 ' + APP_NAME + ' \u00B7 Phiz MiniApp' });
-        }
-      }
+      } catch(e) {}
     }
 
     /* ─── PHIZ NATIVE SHARE ─────────────────────────────────── */
@@ -1387,13 +1535,8 @@
     }
 
     function handleShare() {
-      if (typeof pz !== 'undefined' && pz.showShareMenu) {
-        // Dentro do Phiz: abre o share nativo para enviar ao chat
-        pz.showShareMenu();
-      } else {
-        // Fora do Phiz (browser): mostra o card canvas para copiar
-        openShareCard();
-      }
+      // Sempre abre o card com a imagem para o usuário compartilhar
+      openShareCard();
     }
 
     shareBtn.addEventListener('click', handleShare);
