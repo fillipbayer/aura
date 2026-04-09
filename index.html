@@ -1493,20 +1493,83 @@
       shareOverlay.classList.remove('show');
     }
 
-    // Compartilha a imagem canvas via Web Share API (funciona no webview do Phiz
-    // e em browsers modernos). Fallback: pz.showShareMenu → clipboard.
+    // Detecta se está rodando dentro do Phiz web-view
+    function isPhizWebView() {
+      return typeof pz !== 'undefined' ||
+             /PhizApp|MicroMessenger/i.test(navigator.userAgent);
+    }
+
+    // Mostra a imagem em tela cheia para o usuário segurar e salvar no álbum.
+    // Padrão necessário no Phiz/WeChat web-view, que não suporta Web Share com arquivos.
+    function showImageToSave(blob) {
+      const url = URL.createObjectURL(blob);
+      const ov = document.createElement('div');
+      ov.id = 'saveImgOv';
+      ov.style.cssText = [
+        'position:fixed;inset:0;z-index:9999',
+        'background:rgba(0,0,0,0.93)',
+        'display:flex;flex-direction:column',
+        'align-items:center;justify-content:center;gap:14px',
+        'padding:28px 20px',
+        'touch-action:none'
+      ].join(';');
+
+      const img = document.createElement('img');
+      img.src = url;
+      img.style.cssText = [
+        'max-width:min(300px,80vw)',
+        'max-height:min(300px,60vh)',
+        'border-radius:18px',
+        'box-shadow:0 12px 40px rgba(0,0,0,0.5)',
+        'display:block'
+      ].join(';');
+
+      const hint1 = document.createElement('p');
+      hint1.textContent = 'Segure a imagem para salvar no álbum';
+      hint1.style.cssText = 'color:rgba(255,255,255,0.85);font-size:15px;text-align:center;font-family:Inter,sans-serif;margin:0';
+
+      const hint2 = document.createElement('p');
+      hint2.textContent = 'Depois compartilhe do álbum de fotos ✦';
+      hint2.style.cssText = 'color:rgba(255,255,255,0.45);font-size:13px;text-align:center;font-family:Inter,sans-serif;margin:0';
+
+      const close = document.createElement('button');
+      close.textContent = '×';
+      close.style.cssText = [
+        'position:absolute;top:16px;right:16px',
+        'width:36px;height:36px',
+        'background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18)',
+        'color:rgba(255,255,255,0.8);font-size:20px;line-height:1',
+        'border-radius:50%;cursor:pointer',
+        'display:flex;align-items:center;justify-content:center'
+      ].join(';');
+      close.onclick = () => { document.body.removeChild(ov); URL.revokeObjectURL(url); };
+
+      ov.append(close, img, hint1, hint2);
+      document.body.appendChild(ov);
+    }
+
+    // Compartilha a imagem canvas.
+    // – Fora do Phiz: Web Share API com arquivo (WhatsApp, etc.)
+    // – Dentro do Phiz web-view: mostra imagem para salvar no álbum e compartilhar
     async function phizShareFromCard() {
       return new Promise(resolve => {
         shareCanvas.toBlob(async blob => {
           const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
-          // 1ª tentativa: Web Share API com arquivo de imagem
+
+          // Dentro do Phiz web-view → salvar no álbum é o caminho correto
+          if (isPhizWebView()) {
+            showImageToSave(blob);
+            resolve(); return;
+          }
+
+          // Web Share API com arquivo (iOS Safari, Android Chrome)
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
               await navigator.share({ title: '\u2746 ' + APP_NAME, files: [file] });
               resolve(); return;
-            } catch(e) { /* usuário cancelou ou não suportado */ }
+            } catch(e) { /* cancelou ou não suportado */ }
           }
-          // 2ª tentativa: Web Share API só com texto (sem arquivo)
+          // Web Share só com texto
           if (navigator.share) {
             try {
               await navigator.share({
@@ -1515,12 +1578,6 @@
               });
               resolve(); return;
             } catch(e) {}
-          }
-          // 3ª tentativa: Phiz nativo (compartilha link do mini app)
-          if (typeof pz !== 'undefined' && pz.showShareMenu) {
-            closeShareCard();
-            pz.showShareMenu();
-            resolve(); return;
           }
           // Último recurso: copia imagem para clipboard
           copyShareImage();
