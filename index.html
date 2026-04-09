@@ -1081,66 +1081,71 @@
 
         // Master compressor para manter tudo elegante e controlado
         const comp = ctx.createDynamicsCompressor();
-        comp.threshold.value = -14;
-        comp.ratio.value = 3;
-        comp.attack.value = 0.01;
-        comp.release.value = 0.22;
+        comp.threshold.value = -18;
+        comp.ratio.value = 2.5;
+        comp.attack.value = 0.008;
+        comp.release.value = 0.3;
         comp.connect(ctx.destination);
 
-        // Camada principal: swell luminoso, mais cinematográfico e menos infantil
-        const bloom = ctx.createOscillator();
-        const bloomGain = ctx.createGain();
-        const bloomFilter = ctx.createBiquadFilter();
-        bloom.type = 'triangle';
-        bloom.frequency.setValueAtTime(340, now);
-        bloom.frequency.exponentialRampToValueAtTime(640, now + 0.32);
-        bloomFilter.type = 'lowpass';
-        bloomFilter.frequency.setValueAtTime(900, now);
-        bloomFilter.frequency.exponentialRampToValueAtTime(3200, now + 0.36);
-        bloomGain.gain.setValueAtTime(0.001, now);
-        bloomGain.gain.exponentialRampToValueAtTime(0.11, now + 0.08);
-        bloomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
-        bloom.connect(bloomFilter);
-        bloomFilter.connect(bloomGain);
-        bloomGain.connect(comp);
-        bloom.start(now);
-        bloom.stop(now + 0.8);
+        // Camada principal: um lift elegante, como uma conquista importante.
+        const lift = ctx.createOscillator();
+        const liftGain = ctx.createGain();
+        const liftFilter = ctx.createBiquadFilter();
+        lift.type = 'sawtooth';
+        lift.frequency.setValueAtTime(220, now);
+        lift.frequency.exponentialRampToValueAtTime(440, now + 0.28);
+        liftFilter.type = 'lowpass';
+        liftFilter.frequency.setValueAtTime(700, now);
+        liftFilter.frequency.exponentialRampToValueAtTime(2600, now + 0.3);
+        liftGain.gain.setValueAtTime(0.001, now);
+        liftGain.gain.exponentialRampToValueAtTime(0.035, now + 0.06);
+        liftGain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+        lift.connect(liftFilter);
+        liftFilter.connect(liftGain);
+        liftGain.connect(comp);
+        lift.start(now);
+        lift.stop(now + 0.6);
 
-        // Harmônicos abertos: acorde suspenso/aspiracional em vez de "fofinho"
-        const chord = [392.0, 493.88, 587.33, 783.99];
+        // Acorde com sensação de vitória sofisticada: Gmaj9 aberto e arejado.
+        const chord = [392.0, 493.88, 587.33, 739.99];
         chord.forEach((freq, i) => {
-          const osc  = ctx.createOscillator();
+          const osc = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = i % 2 === 0 ? 'sine' : 'triangle';
-          osc.frequency.setValueAtTime(freq * 0.985, now + i * 0.03);
-          osc.frequency.exponentialRampToValueAtTime(freq, now + i * 0.03 + 0.12);
-          gain.gain.setValueAtTime(0.001, now + i * 0.03);
-          gain.gain.exponentialRampToValueAtTime(0.075 - i * 0.01, now + i * 0.03 + 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.03 + 0.95);
-          osc.connect(gain);
+          const filter = ctx.createBiquadFilter();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq * 0.995, now + i * 0.045);
+          osc.frequency.exponentialRampToValueAtTime(freq, now + i * 0.045 + 0.14);
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(1800, now + i * 0.045);
+          gain.gain.setValueAtTime(0.001, now + i * 0.045);
+          gain.gain.exponentialRampToValueAtTime(0.045 - i * 0.006, now + i * 0.045 + 0.09);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 1.15);
+          osc.connect(filter);
+          filter.connect(gain);
           gain.connect(comp);
-          osc.start(now + i * 0.03);
-          osc.stop(now + i * 0.03 + 1.0);
+          osc.start(now + i * 0.045);
+          osc.stop(now + i * 0.045 + 1.2);
         });
 
-        // Cintilação final: poucas notas altas, mais refinadas
-        const sparkNotes = [1174.66, 1318.5, 1567.98];
-        sparkNotes.forEach((freq, i) => {
-          const osc  = ctx.createOscillator();
+        // Brilho final: duas notas altas suaves, tipo cristal premium.
+        const shineNotes = [987.77, 1318.5];
+        shineNotes.forEach((freq, i) => {
+          const osc = ctx.createOscillator();
           const gain = ctx.createGain();
+          const delay = 0.2 + i * 0.11;
           osc.type = 'sine';
-          osc.frequency.value = freq;
-          gain.gain.setValueAtTime(0.001, now + 0.18 + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.03, now + 0.21 + i * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55 + i * 0.08);
+          osc.frequency.setValueAtTime(freq, now + delay);
+          gain.gain.setValueAtTime(0.001, now + delay);
+          gain.gain.exponentialRampToValueAtTime(0.022, now + delay + 0.04);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + delay + 0.62);
           osc.connect(gain);
           gain.connect(comp);
-          osc.start(now + 0.18 + i * 0.08);
-          osc.stop(now + 0.62 + i * 0.08);
+          osc.start(now + delay);
+          osc.stop(now + delay + 0.66);
         });
 
-        // Ar sutil para dar sensação de expansão sem soar infantil
-        const bufSize = ctx.sampleRate * 0.22;
+        // Ar sutil para sensação de expansão e brilho.
+        const bufSize = ctx.sampleRate * 0.18;
         const buf = ctx.createBuffer(1, bufSize, ctx.sampleRate);
         const data = buf.getChannelData(0);
         for (let i = 0; i < bufSize; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / bufSize);
@@ -1148,17 +1153,17 @@
         noise.buffer = buf;
         const noiseFilter = ctx.createBiquadFilter();
         noiseFilter.type = 'bandpass';
-        noiseFilter.frequency.value = 1800;
-        noiseFilter.Q.value = 0.7;
+        noiseFilter.frequency.value = 2400;
+        noiseFilter.Q.value = 0.5;
         const noiseGain = ctx.createGain();
         noiseGain.gain.setValueAtTime(0.001, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.028, now + 0.04);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        noiseGain.gain.exponentialRampToValueAtTime(0.012, now + 0.03);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
         noise.connect(noiseFilter);
         noiseFilter.connect(noiseGain);
         noiseGain.connect(comp);
         noise.start(now);
-        noise.stop(now + 0.25);
+        noise.stop(now + 0.19);
       } catch(e) {}
     }
 
