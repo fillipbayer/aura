@@ -1716,6 +1716,18 @@
         shareCanvas.toBlob(async blob => {
           const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
 
+          // DEBUG TEMPORÁRIO — mostra qual caminho o share está tomando
+          const dbg = {
+            isPhiz: isPhizWebView(),
+            hasPz: typeof pz !== 'undefined',
+            hasShare: !!navigator.share,
+            hasCanShare: !!navigator.canShare,
+            canShareFiles: !!(navigator.canShare && navigator.canShare({ files: [file] })),
+            ua: navigator.userAgent.slice(0, 80)
+          };
+          showToast('DBG: ' + JSON.stringify(dbg), 8000);
+          console.log('[AURA SHARE DEBUG]', dbg);
+
           // 1º — Web Share API com arquivo (funciona no browser E dentro do Phiz web-view)
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
@@ -1733,7 +1745,7 @@
             pz.saveImageToPhotosAlbum({
               filePath: dataUrl,
               success: function() { showToast('✦ imagem salva no álbum'); resolve(); },
-              fail:    function() { showImageToSave(blob); resolve(); }
+              fail:    function(err) { showToast('pz.saveImg FAIL: ' + JSON.stringify(err), 6000); showImageToSave(blob); resolve(); }
             });
             return;
           }
