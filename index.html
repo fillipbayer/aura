@@ -1716,38 +1716,29 @@
         shareCanvas.toBlob(async blob => {
           const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
 
-          // Dentro do Phiz web-view → salva direto no álbum via API nativa
-          if (isPhizWebView()) {
-            if (typeof pz !== 'undefined' && typeof pz.saveImageToPhotosAlbum === 'function') {
-              // Domínio whitelistado: converte canvas para data URL e salva no álbum
-              const dataUrl = shareCanvas.toDataURL('image/png');
-              pz.saveImageToPhotosAlbum({
-                filePath: dataUrl,
-                success: function() {
-                  showToast('✦ imagem salva no álbum de fotos');
-                  resolve();
-                },
-                fail: function() {
-                  // Fallback: mostra overlay para o usuário segurar e salvar
-                  showImageToSave(blob);
-                  resolve();
-                }
-              });
-            } else {
-              showImageToSave(blob);
-              resolve();
-            }
-            return;
-          }
-
-          // Web Share API com arquivo (iOS Safari, Android Chrome)
+          // 1º — Web Share API com arquivo (funciona no browser E dentro do Phiz web-view)
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
               await navigator.share({ title: '\u2746 ' + APP_NAME, files: [file] });
               resolve(); return;
-            } catch(e) { /* cancelou ou não suportado */ }
+            } catch(e) {
+              // Usuário cancelou → para aqui. Erro de suporte → continua para fallback
+              if (e && e.name === 'AbortError') { resolve(); return; }
+            }
           }
-          // Web Share só com texto
+
+          // 2º — Dentro do Phiz: salva no álbum via API nativa (pz.saveImageToPhotosAlbum)
+          if (isPhizWebView() && typeof pz !== 'undefined' && typeof pz.saveImageToPhotosAlbum === 'function') {
+            const dataUrl = shareCanvas.toDataURL('image/png');
+            pz.saveImageToPhotosAlbum({
+              filePath: dataUrl,
+              success: function() { showToast('✦ imagem salva no álbum'); resolve(); },
+              fail:    function() { showImageToSave(blob); resolve(); }
+            });
+            return;
+          }
+
+          // 3º — Web Share só com texto (fallback sem arquivo)
           if (navigator.share) {
             try {
               await navigator.share({
@@ -1757,6 +1748,10 @@
               resolve(); return;
             } catch(e) {}
           }
+
+          // 4º — Overlay manual (segurar para salvar)
+          if (isPhizWebView()) { showImageToSave(blob); resolve(); return; }
+
           resolve();
         }, 'image/png');
       });
