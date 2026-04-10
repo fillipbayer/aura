@@ -10,6 +10,8 @@
   <link rel="icon" id="favicon" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;1,400;1,600&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
+  <!-- Phiz JSSDK — habilita pz.miniProgram dentro do web-view -->
+  <script src="https://phizclip-assets.phiz.live/phiz/jssdk-1.4.20.js"></script>
   <style>
     *, *::before, *::after {
       box-sizing: border-box;
@@ -1716,18 +1718,6 @@
         shareCanvas.toBlob(async blob => {
           const file = new File([blob], APP_NAME.toLowerCase() + '.png', { type: 'image/png' });
 
-          // DEBUG TEMPORÁRIO — mostra qual caminho o share está tomando
-          const dbg = {
-            isPhiz: isPhizWebView(),
-            hasPz: typeof pz !== 'undefined',
-            hasShare: !!navigator.share,
-            hasCanShare: !!navigator.canShare,
-            canShareFiles: !!(navigator.canShare && navigator.canShare({ files: [file] })),
-            ua: navigator.userAgent.slice(0, 80)
-          };
-          showToast('DBG: ' + JSON.stringify(dbg), 8000);
-          console.log('[AURA SHARE DEBUG]', dbg);
-
           // 1º — Web Share API com arquivo (funciona no browser E dentro do Phiz web-view)
           if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
             try {
@@ -1745,7 +1735,7 @@
             pz.saveImageToPhotosAlbum({
               filePath: dataUrl,
               success: function() { showToast('✦ imagem salva no álbum'); resolve(); },
-              fail:    function(err) { showToast('pz.saveImg FAIL: ' + JSON.stringify(err), 6000); showImageToSave(blob); resolve(); }
+              fail:    function() { showImageToSave(blob); resolve(); }
             });
             return;
           }
@@ -1833,66 +1823,16 @@
       setTimeout(() => { if (t.parentNode) t.parentNode.removeChild(t); }, duration);
     }
 
-    async function handleDonation() {
-      if (donatePayBtn.disabled) return;
-
-      // Fora do Phiz — mostra instrução alternativa
-      if (typeof pz === 'undefined') {
-        donateNote.textContent = 'abra no app Phiz para pagar ✦';
-        setTimeout(() => { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3000);
+    function handleDonation() {
+      // Dentro do Phiz web-view → navega para página nativa de pagamento
+      if (typeof pz !== 'undefined' && pz.miniProgram) {
+        pz.miniProgram.navigateTo({ url: '/pages/pay/pay' });
+        closeDonate();
         return;
       }
-
-      // Dentro do Phiz — solicita pagamento via SDK
-      donatePayBtn.disabled = true;
-      donatePayBtn.textContent = 'aguarde…';
-      donateNote.textContent = 'preparando pagamento…';
-
-      try {
-        // Chama backend para gerar parâmetros assinados do pagamento
-        const params = await fetchPaymentParams({ amount: 100, desc: 'Apoio ao desenvolvedor Aura' });
-
-        pz.requestPayment(Object.assign({}, params, {
-          success: function() {
-            donatePayBtn.textContent = '✦ obrigado! ✦';
-            donateNote.textContent = 'sua energia alimenta o projeto 💜';
-            setTimeout(function() {
-              closeDonate();
-              donatePayBtn.disabled = false;
-              donatePayBtn.textContent = 'Pagar com Phiz';
-              donateNote.textContent = 'pagamento seguro via Phiz Pay';
-            }, 2800);
-          },
-          fail: function(err) {
-            donatePayBtn.disabled = false;
-            donatePayBtn.textContent = 'Pagar com Phiz';
-            const msg = (err && err.errMsg) ? err.errMsg : 'pagamento cancelado';
-            donateNote.textContent = msg;
-            setTimeout(function() { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3000);
-          }
-        }));
-      } catch(e) {
-        donatePayBtn.disabled = false;
-        donatePayBtn.textContent = 'Pagar com Phiz';
-        donateNote.textContent = 'backend de pagamento não configurado';
-        setTimeout(function() { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3500);
-      }
-    }
-
-    // ── Backend de pagamento ───────────────────────────────────
-    // Para ativar: implemente um endpoint (ex: Cloudflare Worker) que
-    // recebe { amount, desc } e retorna os parâmetros assinados pelo
-    // servidor Phiz Pay: { timeStamp, nonceStr, package, signType, paySign }
-    // Documentação: phizclip-assets.phiz.live/phizclip/doc/pt/develop/api/payment.html
-    async function fetchPaymentParams(order) {
-      // const res = await fetch('/api/payment/create', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(order)
-      // });
-      // if (!res.ok) throw new Error('payment_backend_error');
-      // return res.json(); // { timeStamp, nonceStr, package, signType, paySign }
-      throw new Error('payment_backend_not_configured');
+      // Fora do Phiz — instrução para abrir no app
+      donateNote.textContent = 'abra no app Phiz para pagar ✦';
+      setTimeout(function() { donateNote.textContent = 'pagamento seguro via Phiz Pay'; }, 3000);
     }
 
     /* ─── EVENTS ─────────────────────────────────────────────── */
